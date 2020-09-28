@@ -1,0 +1,162 @@
+\documentclass{beamer} %[8pt]
+
+\mode<presentation>
+{
+  \usetheme{default}      % or try Darmstadt, Madrid, Warsaw, ...
+  \usecolortheme{default} % or try albatross, beaver, crane, ...
+  \usefonttheme{default}  % or try serif, structurebold, ...
+  \setbeamertemplate{navigation symbols}{}
+  \setbeamertemplate{caption}[numbered]
+} 
+\usepackage[utf8]{inputenc}
+
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    citecolor=blue,
+    linkcolor=red, % blue
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+
+\usepackage{xcolor}
+% \usepackage[dvipsnames]{xcolor}
+\usepackage{algorithm, algorithmic}
+\usepackage{algpseudocode}
+
+\usepackage{thm-restate}
+\declaretheorem[name=Theorem, sibling=theorem]{rThm}
+\declaretheorem[name=Lemma, sibling=theorem]{rLem}
+\declaretheorem[name=Corollary, sibling=theorem]{rCor}
+\declaretheorem[name=Proposition, sibling=theorem]{rPro}
+
+
+\title{CS 260 Project}
+\author{Kilichbek Haydarov \and Konstantinos Karatsenidis \and \text{Grigory Malinovsky} \and Fatimah Zohra \and Egor Shulgin}
+\institute[shortinst]{Fast and Tranquil team}
+\date{September 27 2020}
+
+\begin{document}
+
+% \maketitle
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}{Introduction}
+We consider two algorithms for maximizing a monotone submodular function under a cardinality constraint $k$ and apply them to the graph Max Cover problem in particular.
+
+Recent prior algorithms have comparable guarantees in terms of asymptotic worst case analysis, but their actual number of rounds and query complexity depend on very large constants and polynomials in terms of precision and confidence, making them impractical for large data sets.
+\end{frame}
+
+\begin{frame}{Max cover on random graphs} % Problem Description
+Recall the max cover objective: given a graph $G$, the cover function $f(S)$ measures the count of nodes with at least one neighbor in $S$. This is a canonical monotone submodular function. To compare the algorithms’ runtimes under a range of conditions, we solve max cover on synthetic graphs generated via four different well-studied graph models:
+\emph{Stochastic Block Model} (SBM); \emph{Erd\H{o}s R\'{e}nyi} (ER); \emph{Watts-Strogatz} (WS); and \emph{Barb\'{a}si-Albert} (BA)
+% \begin{itemize}
+%     \item Erd˝os R´enyi. We generate $G(n, p)$ graphs with a $p = 0.01$ probability of each edge. Since many nodes have similar degree in this model and each node’s edges are spread randomly across the graph, a random set of nodes often achieves good coverage.
+%     \item Stochastic block model. We generate SBM graphs with a $p = 0.1$ probability of an edge between each pair of nodes in the same cluster. Here, we expect that a good solution will cover nodes in all clusters.
+%     \item Watts-Strogatz. We generate WS graphs initialized as ring lattices with 2 edges per node and a $p = 0.1$ probability of rewiring edges. In these ‘small-world’ graphs, many nodes have identical degree, so good solutions contain nodes chosen to minimize coverage overlaps.
+%     \item Barb´asi-Albert. We generate BA graphs with $m = 1$ edges added per iteration. BA graphs exhibit scale-free structure and tend to have a small set of high-degree nodes. Therefore, it is often possible to obtain high coverage in these graphs by choosing the highest degree nodes.
+% \end{itemize}
+
+\[\max _{|S| \leq k} \sum_{a \in S} f(a)\]
+    % Max cover on synthetic graphs generated via four different well-studied graph models: Stochastic Block Model (SBM); Erd˝os R´enyi (ER); Watts-Strogatz (WS); and Barb´asi-Albert (BA)
+\end{frame}
+
+\begin{frame}{Algorithm 1: Randomized Parallel Greedy}
+\begin{algorithm}[H]
+\caption{Randomized Parallel Greedy}
+\begin{algorithmic}
+    	\STATE \textbf{input} function $f$, cardinality constraint $k$, parameter $\varepsilon$
+\STATE$1 . Q \leftarrow \emptyset, t \leftarrow 0, \lambda \leftarrow \mathrm{OPT} / /$ or any $\lambda \geq \mathrm{OPT}$
+\STATE 2. while $t \leq(1-2 \epsilon) k$ and $\lambda \geq e^{-1}$ OPT
+\STATE \quad A. let $S=\left\{j \in \mathcal{N}: f_{Q}(j) \geq \frac{(1-\epsilon) \lambda}{k}\right\}$
+\STATE B. while $S$ is not empty and $t \leq(1-2 \epsilon) k$
+\STATE i. chose $\delta$ maximal s.t.
+\STATE a. $F_{Q}(Q+\delta S) \geq(1-\epsilon)^{2} \lambda \frac{\delta|S|}{k}$
+\STATE b. $t+\delta|S| \leq(1-2 \epsilon) k$
+\STATE ii. sample $R \sim \delta S$
+\STATE iii. $Q \leftarrow Q \cup R, t \leftarrow t+\delta|S|$
+\STATE iv. update $S$
+\STATE C. $\quad \lambda \leftarrow(1-\epsilon) \lambda$
+\STATE 3. return $Q$
+  \end{algorithmic}
+  \label{alg:full}
+\end{algorithm}
+
+
+\end{frame}
+
+\begin{frame}{Algorithm 2: Fast Adaptive Sequencing Technique (\textsc{Fast})} 
+\begin{algorithm}[H]
+\caption{\textsc{Fast-Full}: the full algorithm}
+\begin{algorithmic}
+    	\STATE \textbf{input} function $f$, cardinality constraint $k$, parameter $\varepsilon$
+    	\STATE $V \leftarrow$ \textsc{Geometric}$(\max_{a \in N} f(a), \max_{|S| \leq k} \sum_{a \in S} f(a), 1 - \varepsilon)$
+    	\STATE $v^{\star} \leftarrow$ \textsc{Binary-Search}$(V, \max\{v \in V: f(S_v) \geq (1 - 1/e)v\})$
+    	\STATE \ \ \ \ \ where $S_v \leftarrow$ \textsc{FAST}$(v)$
+    	\STATE \textbf{return} $S_{v^{\star}}$ 
+  \end{algorithmic}
+  \label{alg:full}
+\end{algorithm}
+\end{frame}
+
+\begin{frame}{Theoretic guarantee}
+We show that \textsc{FAST} obtains a $1-1/e-\epsilon$ approximation w.p. $1- \delta$ and that it has $\tilde{O}(\varepsilon^{-2} \log n)$  adaptive complexity and $\tilde{O}(\varepsilon^{-2} n +\varepsilon^{-4} \log(n)  \log(\delta^{-1}))$ query complexity.
+
+\begin{restatable}{rThm}{thmmain}
+\label{thm:main} 
+Assume $k \geq \frac{2 \log(2\delta^{-1} \ell)}{\varepsilon^2 (1 - 5\varepsilon)}$ and $\varepsilon \in (0, 0.1)$, where  $\ell = \log(\frac{\log k}{\epsilon})$. Then, \algoptimized \ with $m = \frac{2 + \varepsilon}{\varepsilon^2(1 -  3\varepsilon)} \log(\frac{4\ell\log n}{\delta \varepsilon^2})$ has at most $\varepsilon^{-2} \log(n)  \ell^2$  adaptive rounds,   
+$2\varepsilon^{-2}  \ell n +  \varepsilon^{-2} \log(n) \ell^2 m$ queries, and achieves a $1 - \frac{1}{e} - 4 \varepsilon$ approximation 
+w.p. $1 - \delta$.
+\end{restatable}
+
+\begin{columns}
+    \column{\dimexpr\paperwidth-15pt}
+    \vspace{-15pt}
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{lllllll}\vspace{0.2cm}
+        & \emph{Query complexity} & \emph{Adaptivity} &   \\\ \vspace{0.3cm}
+%  Randomized-Parallel-Greedy
+ \textsc{Rand-P-Greedy}~\cite{chekuri2018submodular}& $\mathcal{O}\left(  \frac{n}{\varepsilon^4}  \log\left(\frac{n}{\delta}\right) \log^2 n\right)  $ & $ \mathcal{O}\left(\frac{\log n}{\varepsilon^2}  \right)$ & \\\ \vspace{0.3cm}
+  \textsc{FAST} &     $\mathcal{O}\left(\frac{  n \ell}{\varepsilon^2} +  \frac{ \ell^2 \log n}{\epsilon^4}   \log(\frac{\ell\log n}{\delta \varepsilon^2})\right)$        &   $\mathcal{O}\left(\frac{ \ell^2 \log n}{\varepsilon^2}\right)$   & 
+\end{tabular}
+  \caption{Comparison on the query complexity and adaptivity achieved in previous work and in this paper in order to obtain a $1-1/e-\epsilon$ approximation with probability $1 - \delta$, where  $\ell = \log(\frac{\log k}{\epsilon})$.  }
+  \label{tab:queries}
+\end{center}
+\end{table}
+\end{columns}
+\end{frame}
+
+\begin{frame}{References}
+\tiny % \small
+\begin{thebibliography}{99}
+    \bibitem[NW78]{nemhauser1978best} George~L Nemhauser and Laurence~A Wolsey.
+	\newblock Best Algorithms for Approximating the Maximum of a Submodular Set Function.
+	\newblock {\em Mathematics of operations research}, 3(3):177--188, 1978.
+	
+    \bibitem[CQ19b]{chekuri2018submodular} Chandra Chekuri and Kent Quanrud.
+	\newblock Submodular Function Maximization in Parallel via the Multilinear Relaxation.
+	\newblock \emph{Proceedings of the 2019 Annual ACM-SIAM Symposium on Discrete Algorithms, 2019}
+
+    \bibitem[Breuer et al, 2020]{breuer2019fast} A. Breuer, E. Balkanski, and Y. Singer
+	\newblock The FAST Algorithm for Submodular Maximization.
+	\newblock \emph{Proceedings of the 37th International Conference on Machine Learning, 2020.}
+	
+	\bibitem[BRS19b]{BRS19b} Eric Balkanski, Aviad Rubinstein, and Yaron Singer.
+	\newblock An optimal approximation for submodular maximization under a matroid constraint in the adaptive complexity model.
+	\newblock {\em STOC}, 2019.
+	
+% 	\bibitem[Liu et al, 2020]{liu_fedsel_2020} R. Liu, Y. Cao, M. Yoshikawa, and H. Chen.
+% 	\newblock FedSel: Federated SGD under Local Differential Privacy with Top-k Dimension Selection.
+% 	\newblock \emph{Foundations and Trends in Theoretical Computer Science, 9(3–4):211–407, 2014.}
+\end{thebibliography}
+\end{frame}
+
+\end{document}

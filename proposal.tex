@@ -1,0 +1,244 @@
+% \documentclass[letterpaper,12pt]{article}
+\documentclass[11pt, a4paper]{article} 
+% \documentclass[11pt,a4paper]{report}
+\usepackage[margin=1in]{geometry}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage{graphicx}
+% \usepackage{subcaption}
+\usepackage{booktabs}
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    citecolor=blue,
+    linkcolor=red, % blue
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+
+% \usepackage{xcolor}
+% \usepackage[dvipsnames]{xcolor}
+% \usepackage{algorithm, algorithmic}
+% \usepackage{algpseudocode}
+
+% \usepackage{thm-restate}
+% \declaretheorem[name=Theorem, sibling=theorem]{rThm}
+% \declaretheorem[name=Lemma, sibling=theorem]{rLem}
+% \declaretheorem[name=Corollary, sibling=theorem]{rCor}
+% \declaretheorem[name=Proposition, sibling=theorem]{rPro}
+
+\input{commands.tex}
+
+\title{CS 260 Project: Parallel algorithms for submodular maximization}
+\author{Kilichbek Haydarov \and Konstantinos Karatsenidis \and Grigory Malinovsky \and Egor Shulgin \and Fatimah Zohra}
+% \institute[shortinst]{Fast and Tranquil team}
+\date{September 27 2020}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+Submodular function maximization is a classical combinatorial optimization problem. Submodular functions have a natural diminishing returns property which makes them suitable for many applications. More recently, due to theoretical developments and a huge number of applications ranging from algorithmic
+game theory, machine learning, including automatic summarization, multi-document summarization, feature selection, active learning, sensor placement, image collection summarization and many other domains the interest in their research has been revived.
+
+We consider two algorithms~\cite{chekuri2018submodular, breuer2019fast} for maximizing a monotone submodular function under a cardinality constraint $k$ and apply them for graph \textbf{Max Cover} problem in particular.
+% Recent prior algorithms have comparable guarantees in terms of asymptotic worst case analysis, but their actual number of rounds and query complexity depend on very large constants and polynomials in terms of precision and confidence, making them impractical for large data sets.
+Informally, a function is submodular if it exhibits a natural diminishing returns property.  For the canonical problem of maximizing a monotone submodular function under a cardinality constraint, it is well known that the greedy algorithm, which iteratively adds elements whose marginal contribution is largest to the solution, obtains a $1-1/e$ approximation guarantee~\cite{NWF78} which is optimal for polynomial-time algorithms~\cite{nemhauser1978best}.
+
+Accelerating computation beyond linear runtime requires \emph{parallelization}.  The parallel runtime of blackbox optimization is measured by \emph{adaptivity}, which is the number of sequential rounds an algorithm requires when polynomially-many queries can be executed in parallel in every round.  For maximizing a submodular function defined over a ground set of $n$ elements under a cardinality constraint $k$, the adaptivity of the naive greedy algorithm is $\cO(k)$, which in the worst case is $\cO(n)$.  Until recently no algorithm was known to have better parallel runtime than that of naive greedy. 
+
+\section{Mathematical background}
+\begin{definition}[Submodular function]
+A real-valued set function $f: 2^{N} \rightarrow  \mathbb{R}$ is submodular iff
+\begin{equation}
+   f(A)+f(B) \geq f(A \cup B)+f(A \cap B)\text{ for all }  A, B \subseteq N  
+\end{equation}
+\begin{itemize}
+    \item $f$ is nonnegative if $f(S) \geq 0 \text{ for all } S \in N.$
+    \item  $f$ is monotone if $S \in T$ implies $f(S) \leq f(T).$
+    \item  $f$ is normalized if $f(\emptyset) = 0.$
+\end{itemize}
+
+\end{definition}
+
+We have another equivalent definition of submodularity is via marginal values. 
+ 
+\begin{definition}[Marginal value]
+For a real-valued set function $f : 2^N \rightarrow R$, the marginal value of a set U with respect to a set S is defined as
+\begin{equation}
+    f_{S}(U) = f(S \cup U)-f(S)
+\end{equation}
+We also use the notation $S + i$ and $S + i + j$ as short hand for $S \cup {i}$ and $S \cup {i, j}.$ 
+\end{definition}
+
+\begin{definition}[Submodularity via marginal values]
+A set function $f$ is submodular iff it satisfies the following property modeling decreasing marginal returns:
+\begin{equation}
+f_{S}(i) \geq f_{T}(i) \text { for all } S \subset T \subseteq \mathcal{N} \text { and } i \notin T
+\end{equation}
+
+\end{definition}
+\begin{definition}[Value of optimal solution]
+OPT value is defined as
+\begin{equation}
+  O P T=\max _{S:|S| \leq K} f(S)  
+\end{equation}
+
+
+\end{definition}
+
+
+\section{Problem Description} % Max cover on random graphs
+Recall the max cover objective: given a graph $G$, the cover function $f(S)$ measures the count of nodes with at least one neighbor in $S$. This is a canonical monotone submodular function. 
+\begin{equation}
+    \max _{|S| \leq k} f(S)
+\end{equation}
+To compare the algorithms’ runtimes under a range of conditions, we plan to solve max cover on synthetic graphs generated via four different well-studied graph models:
+\begin{itemize}
+    \item \emph{Stochastic Block Model} (SBM);
+    \item \emph{Erd\H{o}s R\'{e}nyi} (ER);
+    \item \emph{Watts-Strogatz} (WS);
+    \item \emph{Barb\'{a}si-Albert} (BA)
+\end{itemize}
+ 
+% \begin{itemize}
+%     \item Erd˝os R´enyi. We generate $G(n, p)$ graphs with a $p = 0.01$ probability of each edge. Since many nodes have similar degree in this model and each node’s edges are spread randomly across the graph, a random set of nodes often achieves good coverage.
+%     \item Stochastic block model. We generate SBM graphs with a $p = 0.1$ probability of an edge between each pair of nodes in the same cluster. Here, we expect that a good solution will cover nodes in all clusters.
+%     \item Watts-Strogatz. We generate WS graphs initialized as ring lattices with 2 edges per node and a $p = 0.1$ probability of rewiring edges. In these ‘small-world’ graphs, many nodes have identical degree, so good solutions contain nodes chosen to minimize coverage overlaps.
+%     \item Barb´asi-Albert. We generate BA graphs with $m = 1$ edges added per iteration. BA graphs exhibit scale-free structure and tend to have a small set of high-degree nodes. Therefore, it is often possible to obtain high coverage in these graphs by choosing the highest degree nodes.
+% \end{itemize}
+
+    % Max cover on synthetic graphs generated via four different well-studied graph models: Stochastic Block Model (SBM); Erd˝os R´enyi (ER); Watts-Strogatz (WS); and Barb´asi-Albert (BA)
+
+
+
+
+\section{Algorithm 1: Fast Adaptive Sequencing Technique (\textsc{FAST})} 
+We describe the \textsc{FAST-FULL} algorithm (Algorithm~\ref{alg:full}). The main part of the algorithm is the \textsc{FAST} subroutine (Algorithm~\ref{alg:main}), which is instantiated with different guesses of $\OPT$, which is the value of optimal solution. These guesses $v \in V$ of $\OPT$ are geometrically increasing from $\max_{a \in N} f(a)$ to $\max_{|S| \leq k} \sum_{a \in S} f(a)$ by a $(1 - \varepsilon)^{-1}$ factor, so $V$ contains a value that is a $1- \varepsilon$ approximation to $\OPT$. The algorithm binary searches over guesses for the largest guess $v$ that obtains a solution $S$ that is a $1-1/e$ approximation to $v$.
+\begin{algorithm}[H]
+\caption{\textsc{Fast-Full}: the full algorithm}
+\begin{algorithmic}
+    	\STATE \textbf{input} function $f$, cardinality constraint $k$, parameter $\varepsilon$
+    	\STATE $V \leftarrow$ \textsc{Geometric}$(\max_{a \in N} f(a), \max_{|S| \leq k} \sum_{a \in S} f(a), 1 - \varepsilon)$
+    	\STATE $v^{\star} \leftarrow$ \textsc{Binary-Search}$(V, \max\{v \in V: f(S_v) \geq (1 - 1/e)v\})$
+    	\STATE \ \ \ \ \ where $S_v \leftarrow$ \textsc{FAST}$(v)$
+    	\STATE \textbf{return} $S_{v^{\star}}$ 
+  \end{algorithmic}
+  \label{alg:full}
+\end{algorithm}
+\\
+\textsc{FAST} algorithm generates at every iteration a  uniformly random sequence $a_1, \ldots, a_{|X|}$ of the elements $X$ not yet discarded. After the preprocessing step which adds to $S$ elements guaranteed to have high contribution, the  algorithm  identifies a position $i^{\star}$ in this sequence which determines the prefix $A_{i^{\star} - 1}$ that is added to the current solution $S$. Position $i^{\star}$ is defined as the largest position such that there is a large fraction of elements in $X$ with high contribution to $S \cup A_{i^{\star} - 1}$. To find $i^{\star}$, we binary search over geometrically increasing positions $i \in I \subseteq [k]$. At each position $i$, we only evaluate the contributions of elements $a \in R$ , where $R$ is a uniformly random subset of $X$ of size $m$, instead of all elements $X$.  
+
+\begin{algorithm}[H]
+\caption{\algoptimized: the Fast Adaptive Sequencing Technique algorithm}
+\begin{algorithmic}
+    \STATE \textbf{input}  function $f$, cardinality constraint $k$, guess $v$ for $\OPT$, parameter $\varepsilon$
+    \STATE 	 $S \leftarrow \emptyset $
+    \STATE  \textbf{while} $|S| < k$ and number of  iterations  $< \varepsilon^{-1}$ \textbf{do}
+    \STATE   \ \  $X \leftarrow N,  t \leftarrow (1-\varepsilon) (v - f(S))/k$
+	\STATE   \ \ \textbf{while} $X \neq \emptyset$ and $|S| < k$  \textbf{do}
+	\STATE  \ \ \ \   $a_1, \ldots, a_{|X|} \leftarrow \textsc{Sequence}(X, |X|), A_i \leftarrow a_1, \ldots, a_i$
+	\STATE \ \ \ \   $S \leftarrow S \cup \{a_i : f_{S \cup A_{i-1}}(a_i) \geq t \}$
+	\STATE \ \ \ \ $X_0 \leftarrow \{a \in X : f_{S}(a) \geq t\}$
+	\STATE \ \ \ \   \textbf{if} $|X_0| \leq (1 - \varepsilon) |X|$ \textbf{then} $X \leftarrow X_0$ and continue to  next iteration
+	\STATE \ \ \ \  $R \leftarrow \textsc{Sample}(X, m)$, $I \leftarrow \textsc{Geometric}(1, k - |S|, 1 - \varepsilon)$
+    \STATE \ \ \ \  $i^{\star} \leftarrow$ \textsc{Bin-Search}$(I,  \max \{i  \in I : |\left\{a \in R : f_{S \cup A_{i-1}}(a) \geq   t \right\}| \geq (1 - 2 \varepsilon) |R|\})$ 
+	\STATE \ \ \ \  $S \leftarrow S \cup A_{i^{\star} }$
+    	\STATE \textbf{return} $S$
+  \end{algorithmic}
+  \label{alg:main}
+\end{algorithm}
+\section{Algorithm 2: Randomized Parallel Greedy}
+Parallel Greedy is a straightforward parallelization of the original continuous-greedy algorithm due to Călinescu et al.~\cite{CGC11}, specialized to the cardinality polytope. Continuous-greedy is an iterative and monotonic algorithm that, in each iteration, computes the gradient $\nabla F(x)$ and finds the point $v$ in the constraint polytope that maximizes
+$\left<\nabla F(x), v\right>$. 
+
+Since we consider a model where we only have oracle access to the set function $f$, we use the alternative algorithm randomized-parallel-greedy, which is guided by the previous parallel-greedy algorithm, but maintains a discrete set $Q \in N$ rather than a fractional solution $x$. The primary difference is in steps, where rather than add the fractional solution $\delta S$ to our solution, we first sample a set $R\sim\delta S$ (where each coordinate in S is drawn independently with probability $\delta$), and then we add $R$ to the running solution.
+
+The variable $t$ is used to track the expected cardinality of $|Q|$. One can simplify the algorithm by replacing the variable $t$ with $|Q|$ wherever it appears, and the analysis would generally still hold. The inclusion of $t$ makes the analysis more straightforward, as we can use $t$ to track progress throughout the algorithm.
+\begin{algorithm}[H]
+\caption{Randomized Parallel Greedy}
+\begin{algorithmic}
+    	\STATE \textbf{input} function $f$, cardinality constraint $k$, parameter $\varepsilon$
+\STATE$1 . Q \leftarrow \emptyset, t \leftarrow 0, \lambda \leftarrow \mathrm{OPT} / /$ or any $\lambda \geq \mathrm{OPT}$
+\STATE 2. while $t \leq(1-2 \epsilon) k$ and $\lambda \geq e^{-1}$ OPT
+\STATE \quad A. let $S=\left\{j \in N: f_{Q}(j) \geq \frac{(1-\epsilon) \lambda}{k}\right\}$
+\STATE \quad B. while $S$ is not empty and $t \leq(1-2 \epsilon) k$
+\STATE \quad \quad i. chose $\delta$ maximal s.t.
+\STATE \quad \quad \quad a. $F_{Q}(Q+\delta S) \geq(1-\epsilon)^{2} \lambda \frac{\delta|S|}{k}$
+\STATE \quad \quad \quad b. $t+\delta|S| \leq(1-2 \epsilon) k$
+\STATE \quad \quad ii. sample $R \sim \delta S$
+\STATE \quad \quad iii. $Q \leftarrow Q \cup R, t \leftarrow t+\delta|S|$
+\STATE \quad \quad iv. update $S$
+\STATE \quad C. $\quad \lambda \leftarrow(1-\epsilon) \lambda$
+\STATE 3. return $Q$
+  \end{algorithmic}
+  \label{alg:full}
+\end{algorithm}
+
+\section{Theoretical guarantees}
+% \textsc{FAST} obtains a $1-1/e-\epsilon$ approximation w.p. $1- \delta$ and that it has $\tilde{O}(\varepsilon^{-2} \log n)$  adaptive complexity and $\tilde{O}(\varepsilon^{-2} n +\varepsilon^{-4} \log(n)  \log(\delta^{-1}))$ query complexity.
+\begin{theorem}[\textsc{FAST}]
+\label{thm:main_FAST} 
+Assume $k \geq \frac{2 \log(2\delta^{-1} \ell)}{\varepsilon^2 (1 - 5\varepsilon)}$ and $\varepsilon \in (0, 0.1)$, where  $\ell = \log(\frac{\log k}{\epsilon})$. Then, \textsc{FAST} with $m = \frac{2 + \varepsilon}{\varepsilon^2(1 -  3\varepsilon)} \log(\frac{4\ell\log n}{\delta \varepsilon^2})$ has at most $\varepsilon^{-2} \log(n)  \ell^2$  adaptive rounds,   
+$2\varepsilon^{-2}  \ell n +  \varepsilon^{-2} \log(n) \ell^2 m$ queries, and achieves a $1 - \frac{1}{e} - 4 \varepsilon$ approximation 
+w.p. $1 - \delta$.
+\end{theorem}
+
+\begin{theorem}[\textsc{Randomized Parallel Greedy}]
+Let $\epsilon>0$ be given, let $f: 2^{\mathcal{N}} \rightarrow \mathbb{R}_{\geq 0}$ be a normalized, monotone submodular function in the oracle model, and let $k \in \mathbb{N}$. Then with high probability, randomized-parallel-greedy computes a $(1-\epsilon)\left(1-e^{-1}\right)$ multiplicative approximation to the maximum value set of cardinality $k$ with $O\left(\frac{\log n}{\epsilon^{2}}\right)$ expected adaptivity and $\tilde{O}\left(\frac{n}{\epsilon^{4}}\right)$ expected oracle calls to $f$.
+\end{theorem}
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{cllllll}\vspace{0.2cm}
+        & \emph{Query complexity} & \emph{Adaptivity} &   \\\ \vspace{0.3cm}
+%  Randomized-Parallel-Greedy
+ \textsc{Randomized-Parallel-Greedy}~\cite{chekuri2018submodular}& $\mathcal{O}\left(  \frac{n}{\varepsilon^4}  \log\left(\frac{n}{\delta}\right) \log^2 n\right)  $ & $ \mathcal{O}\left(\frac{\log n}{\varepsilon^2}  \right)$ & \\\ \vspace{0.3cm}
+  \textsc{FAST}~\cite{breuer2019fast} &     $\mathcal{O}\left(\frac{  n \ell}{\varepsilon^2} +  \frac{ \ell^2 \log n}{\epsilon^4}   \log(\frac{\ell\log n}{\delta \varepsilon^2})\right)$        &   $\mathcal{O}\left(\frac{ \ell^2 \log n}{\varepsilon^2}\right)$   & 
+\end{tabular}
+  \caption{Comparison on the query complexity and adaptivity achieved in order to obtain a $1-1/e-\epsilon$ approximation with probability $1 - \delta$, where  $\ell = \log(\frac{\log k}{\epsilon})$.  }
+  \label{tab:queries}
+\end{center}
+\end{table}
+
+
+% \tiny % \small
+\begin{thebibliography}{99}
+    \bibitem[NW78]{nemhauser1978best} 
+    George~L Nemhauser and Laurence~A Wolsey.
+	\newblock Best Algorithms for Approximating the Maximum of a Submodular Set Function.
+	\newblock {\em Mathematics of operations research}, 3(3):177--188, 1978.
+	
+	\bibitem[NWF78]{NWF78}
+    George~L Nemhauser, Laurence~A Wolsey, and Marshall~L Fisher.
+    \newblock An analysis of approximations for maximizing submodular set functions.
+    \newblock {\em Mathematical Programming}, 14(1):265--294, 1978.
+
+	
+    \bibitem[CQ19]{chekuri2018submodular} Chandra Chekuri and Kent Quanrud.
+	\newblock Submodular Function Maximization in Parallel via the Multilinear Relaxation.
+	\newblock \emph{Proceedings of the 2019 Annual ACM-SIAM Symposium on Discrete Algorithms, 2019}
+
+    \bibitem[BBY20]{breuer2019fast} A. Breuer, E. Balkanski, and Y. Singer
+	\newblock The FAST Algorithm for Submodular Maximization.
+	\newblock \emph{Proceedings of the 37th International Conference on Machine Learning, 2020.}
+	
+	\bibitem[BRS19]{BRS19} Eric Balkanski, Aviad Rubinstein, and Yaron Singer.
+	\newblock An optimal approximation for submodular maximization under a matroid constraint in the adaptive complexity model.
+	\newblock {\em STOC}, 2019.
+	
+	\bibitem[CGC11]{CGC11}Calinescu, Gruia and Chekuri, Chandra and PÃ¡l, Martin and VondrÃ¡k, Jan
+	\newblock Maximizing a Monotone Submodular Function Subject to a Matroid Constraint
+	\newblock {\em SIAM J. Comput.~40}, 2011.
+	
+% 	\bibitem[Liu et al, 2020]{liu_fedsel_2020} R. Liu, Y. Cao, M. Yoshikawa, and H. Chen.
+% 	\newblock FedSel: Federated SGD under Local Differential Privacy with Top-k Dimension Selection.
+% 	\newblock \emph{Foundations and Trends in Theoretical Computer Science, 9(3–4):211–407, 2014.}
+
+\end{thebibliography}
+
+\end{document}

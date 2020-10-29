@@ -31,8 +31,8 @@
 % \declaretheorem[name=Proposition, sibling=theorem]{rPro}
 
 \input{commands.tex}
-
-\title{CS 260 Project: Parallel algorithms for submodular maximization}
+% CS 260 Project: 
+\title{Parallel Algorithms for Submodular Maximization}
 \author{Kilichbek Haydarov \and Konstantinos Karatsenidis \and Grigory Malinovsky \and Egor Shulgin \and Fatimah Zohra}
 % \institute[shortinst]{Fast and Tranquil team}
 \date{October 28 2020}
@@ -44,18 +44,23 @@
 \maketitle
 
 \section{Introduction}
-Submodular function maximization is a classical combinatorial optimization problem. Submodular functions have a natural diminishing returns property which makes them suitable for many applications. 
+Submodular maximization is a classical combinatorial optimization problem. Submodular functions have a natural diminishing returns property which makes them suitable for many applications. 
 %More recently, due to theoretical developments and a huge number of applications ranging from algorithmic game theory, machine learning, including automatic summarization, multi-document summarization, feature selection, active learning, sensor placement, image collection summarization and many other domains the interest in their research has been revived.
 
 We consider two algorithms~\cite{chekuri2018submodular, breuer2019fast} for maximizing a monotone submodular function under a cardinality constraint $k$ and apply them to the graph \textbf{Max Cover} problem in particular.
 % Recent prior algorithms have comparable guarantees in terms of asymptotic worst case analysis, but their actual number of rounds and query complexity depend on very large constants and polynomials in terms of precision and confidence, making them impractical for large data sets.
-Informally, a function is submodular if it exhibits a natural diminishing returns property.  For the canonical problem of maximizing a monotone submodular function under a cardinality constraint, it is well known that the greedy algorithm, which iteratively adds elements whose marginal contribution is largest to the solution, obtains a $1-1/e$ approximation guarantee~\cite{NWF78} which is optimal for polynomial-time algorithms~\cite{nemhauser1978best}.
+% Informally, a function is submodular if it exhibits a natural diminishing returns property.  
+% For the canonical problem of maximizing a monotone submodular function under a cardinality constraint,
+For this classical problem, it is well known that the greedy algorithm, which iteratively adds elements whose marginal contribution is largest to the solution, obtains a $1-1/e$ approximation guarantee~\cite{NWF78} which is optimal for polynomial-time algorithms~\cite{nemhauser1978best}.
 
-Accelerating computation beyond linear runtime requires \emph{parallelization}.  The parallel runtime of blackbox optimization is measured by \emph{adaptivity}, which is the number of sequential rounds an algorithm requires when polynomially-many queries can be executed in parallel in every round.  For maximizing a submodular function defined over a ground set of $n$ elements under a cardinality constraint $k$, the adaptivity of the naive greedy algorithm is $\cO(k)$, which in the worst case is $\cO(n)$.  Until recently no algorithm was known to have better parallel runtime than that of naive greedy. 
+Accelerating computation 
+%beyond linear runtime 
+requires \emph{parallelization}.  The parallel runtime of blackbox optimization is measured by \emph{adaptivity}, which is the number of sequential rounds an algorithm requires when polynomially-many queries can be executed in parallel in every round.  For maximizing a submodular function defined over a ground set of $n$ elements under a cardinality constraint $k$, the adaptivity of the naive greedy algorithm is $\cO(k)$, which in the worst case is $\cO(n)$.  
+%Until recently no algorithm was known to have better parallel runtime than that of naive greedy. 
 
 \section{Mathematical background}
 \begin{definition}[Submodular function]
-A real-valued set function $f: 2^{N} \rightarrow  \mathbb{R}$ is submodular iff
+For finite set $N$ a real-valued set function $f: 2^{N} \rightarrow  \mathbb{R}$ is submodular iff
 \begin{equation}
    f(A)+f(B) \geq f(A \cup B)+f(A \cap B)\text{ for all }  A, B \subseteq N  
 \end{equation}
@@ -87,28 +92,35 @@ We also use the notation $S + \{i\}$ and $S + \{i\} + \{j\}$ as short hand for $
 
 Just as in the previous definition, it's clear that the marginal value exhibits non-increasing (or diminishing) returns. 
 
-\begin{definition}[Value at the optimal solution]
-Given the submodular function $f$, set $S$, and constraint $k$, the optimal value, OPT, is defined as
-\begin{equation}
-  O P T=\max _{S:|S| \leq k} f(S)  
-\end{equation}
-\end{definition}
+% \begin{definition}[Value at the optimal solution]
+% Given the submodular function $f$, set $S$, and constraint $k$, the optimal value, OPT, is defined as
+% \begin{equation}
+%   O P T=\max _{S:|S| \leq k} f(S)  
+% \end{equation}
+% \end{definition}
 
+\begin{definition}[Adaptivity]
+% An algorithm is $r$-adaptive if it makes $r$ sequential rounds of parallel queries.
+An algorithm is $r$-adaptive if it makes $r$ sequential rounds when polynomially-many queries can be executed in parallel in every round.
+\end{definition}
+% The parallel runtime of blackbox optimization is measured by adaptivity, which is the number of sequential rounds an algorithm requires when polynomially-many queries can be executed in parallel in every round.
+% For maximizing a submodular function defined over a ground set of $n$ elements under a cardinality constraint $k$, the adaptivity of the naive greedy algorithm is $\cO(k)$.
 
 \section{Problem Description} % Max cover on random graphs
-Given these definitions, we can now state the objective of  the Max Cover problem as follows. For a graph $G$, and a set of nodes, $S$, the cover function for the graph, $f(S)$, is a submodular function which measures the count of nodes with at least one neighbor in $S$. 
+Given these definitions, we can now state the objective of the \textbf{Max Cover} problem as follows. For an undirected graph $G = (V, E)$ and a subset of nodes $S \subset V$, the cover function $f(S)$ measures the count of nodes with at least one neighbor in $S$. This is a canonical example of monotone\footnote{$f$ is monotone if $A \subset B$ implies $f(A) \leq f(B)$} submodular function.
 \begin{equation}
-    \max _{|S| \leq k} f(S)
+    {\tt O P T} \eqdef \max _{|S| \leq k} f(S)
 \end{equation}
 
 \begin{figure}[H]
 \centering
 % \begin{center}
 \input{max_cover}
-\caption*{$f(\textcolor{red}{S}) = \textcolor{red}{2} + \textcolor{blue}{3} = 5$}
+\caption{An example of such function evaluation $f(\textcolor{red}{S}) = \textcolor{red}{2} + \textcolor{blue}{3} = 5$}
+\label{fig:max-cover}
 \end{figure}
 
-As stated, this definition of the Max Cover problem tries to find at most $k$ nodes in a graph for which the corresponding set of nodes has the largest submodular value (the output of the submodular function). And the submodular value in the context of the max cover problem can intuitively be seen as a measure of connectivity (or coverage). In this way, the max cover objective tries to find the smallest constrained set of nodes which gives maximum connectivity (or coverage).
+As stated, this definition of the Max Cover problem tries to find at most $k$ nodes in a graph for which the corresponding set of nodes has the largest submodular value (the output of the submodular function). And the submodular value in the context of the max cover problem can intuitively be seen as a measure of coverage.
  
 % \begin{itemize}
 %     \item Erd˝os R´enyi. We generate $G(n, p)$ graphs with a $p = 0.01$ probability of each edge. Since many nodes have similar degree in this model and each node’s edges are spread randomly across the graph, a random set of nodes often achieves good coverage.
@@ -119,12 +131,12 @@ As stated, this definition of the Max Cover problem tries to find at most $k$ no
 
     % Max cover on synthetic graphs generated via four different well-studied graph models: Stochastic Block Model (SBM); Erd˝os R´enyi (ER); Watts-Strogatz (WS); and Barb´asi-Albert (BA)
 
-\section{Algorithm 1: Fast Adaptive Sequencing Technique (\textsc{FAST})} 
-The first of the two algorithms we plan to consider for the Max Cover problem is a randomized parallel algorithm called FAST, which stands for Fast Adaptive Sequencing Technique. The key idea behind this algorithm is the application of Adaptive Sequencing, which, as the name suggests, finds a solution by considering sequences of elements (or nodes in the case of the graph Max Cover problem). The technique works by randomly generating sequences of elements, after which it considers a prefix of the sequence that yields the highest submodular value. This process is iteratively applied wherein each iteration, the elements in the prefix yielding the highest marginal contributions are removed form the considered set. Additionally, elements with low marginal contributions are also removed in each iteration of the technique ~\cite{breuer2019fast}.    
+\section{Algorithm 1: Fast Adaptive Sequencing Technique (\textsc{FAST})}
+The first of the two algorithms we plan to consider for the Max Cover problem is a randomized parallel algorithm called FAST, which stands for Fast Adaptive Sequencing Technique~\cite{breuer2019fast}. The key idea behind this algorithm is the application of Adaptive Sequencing, which, as the name suggests, finds a solution by considering sequences of elements (or nodes in the case of the graph Max Cover problem). The technique works by randomly generating sequences of elements, after which it considers a prefix of the sequence that yields the highest submodular value. This process is iteratively applied wherein each iteration, the elements in the prefix yielding the highest marginal contributions are removed form the considered set. Additionally, elements with low marginal contributions are also removed in each iteration of the technique.    
 
 FAST integrates Adaptive Sequencing with the binary search algorithm. Instead of checking every prefix, it only considers geometrically increasing prefixes of the considered set of elements. It then performs a left binary search to find the optimal prefix.
 
-This modified adaptive sequencing technique is applied at two different levels of the FAST algorithm, which consists of two parts - a sequential outer search that spins off a number of parallel queries, and an inner search corresponding to each of these parallel queries. The outer search, referred to as the \textsc{FAST-FULL} algorithm (Algorithm~\ref{alg:fast-full}) initiates guesses of the optimal set to use as a metric for thresholding good marginal contributions in the corresponding query search. These guesses $v \in V$ of $\OPT$, the candidate optimal solution, are geometrically increasing over the modular contributions of the elements for sets of different sizes -ranging from $\max_{a \in N} f(a)$ to $\max_{|S| \leq k} \sum_{a \in S} f(a)$ by a $(1 - \varepsilon)^{-1}$ geometric factor. For this reason, $V$ will contain a value that is a $1- \varepsilon$ approximation to $\OPT$. Furthermore, this means that the overall search guarantees a solution $S$ that is a $1-1/e$ approximation to $v$ ~\cite{breuer2019fast}.
+This modified adaptive sequencing technique is applied at two different levels of the FAST algorithm, which consists of two parts - a sequential outer search that spins off a number of parallel queries, and an inner search corresponding to each of these parallel queries. The outer search, referred to as the \textsc{FAST-FULL} algorithm (Algorithm~\ref{alg:fast-full}) initiates guesses of the optimal set to use as a metric for thresholding good marginal contributions in the corresponding query search. These guesses $v \in V$ of $\OPT$, the candidate optimal solution, are geometrically increasing over the modular contributions of the elements for sets of different sizes-ranging from $\max_{a \in N} f(a)$ to $\max_{|S| \leq k} \sum_{a \in S} f(a)$ by a $(1 - \varepsilon)^{-1}$ geometric factor. For this reason, $V$ will contain a value that is a $1- \varepsilon$ approximation to $\OPT$. Furthermore, this means that the overall search guarantees a solution $S$ that is a $1-1/e$ approximation to $v$.
 
 In practice, however, a single iteration of this binary search is shown to be sufficient to achieve the approximation guarantee.
 
@@ -146,7 +158,7 @@ The inner search, referred to as the \textsc{FAST} subroutine (Algorithm~\ref{al
 
 The subroutine then iteratively adds to the solution using both Vanilla Adaptive Sequencing, which process a randomly generated sequence $a_1, \ldots, a_{|X|}$ from the set $X$ and the modified Adaptive Sequencing technique that continues to process a sample of the remaining elements in $X$. The Vanilla Adaptive Sequencing is considered as the preprocesing step to help add to the solution elements guaranteed to have a high marginal contribution while aiding in removing elements with low marginal contributions from being considered any further.
 
-The modified Adaptive Sequencing step will then perform a binary search over geometrically increasing prefix indices $i$ to identify a position $i^{\star}$ in this sequence corresponding to the prefix $A_{i^{\star} - 1}$. Position $i^{\star}$ is defined by ~\cite{breuer2019fast} as the largest position such that there is a large fraction of elements in $X$ with high contribution to $S \cup A_{i^{\star} - 1}$ where $S$ is the current solution. This prefix, $A_{i^{\star}}$ is then added to the current solution $S$.
+The modified Adaptive Sequencing step will then perform a binary search over geometrically increasing prefix indices $i$ to identify a position $i^{\star}$ in this sequence corresponding to the prefix $A_{i^{\star} - 1}$. Position $i^{\star}$ is defined by~\cite{breuer2019fast} as the largest position such that there is a large fraction of elements in $X$ with high contribution to $S \cup A_{i^{\star} - 1}$ where $S$ is the current solution. This prefix, $A_{i^{\star}}$ is then added to the current solution $S$.
 
 % \textsc{FAST} algorithm generates at every iteration a  uniformly random sequence $a_1, \ldots, a_{|X|}$ of the elements $X$ not yet discarded. After the preprocessing step which adds to $S$ elements guaranteed to have high contribution,the  algorithm  identifies a position $i^{\star}$ in this sequence which determines the prefix $A_{i^{\star} - 1}$ that is added to the current solution $S$. Position $i^{\star}$ is defined as the largest position such that there is a large fraction of elements in $X$ with high contribution to $S \cup A_{i^{\star} - 1}$. To find $i^{\star}$, we binary search over geometrically increasing positions $i \in I \subseteq [k]$. At each position $i$, we only evaluate the contributions of elements $a \in R$ , where $R$ is a uniformly random subset of $X$ of size $m$, instead of all elements $X$.  
 
@@ -170,27 +182,57 @@ The modified Adaptive Sequencing step will then perform a binary search over geo
   \label{alg:main}
 \end{algorithm}
 \section{Algorithm 2: Randomized Parallel Greedy}
+
+We outline basic properties of a continuous extension of submodular functions to the fractional values in $[0,1]^{N}$ called the multilinear extension.
+
+Denote a finite set $N$, and $f$ will be a set function defined over the power set of $N$.
+
+\begin{equation}
+    f: 2^{N} \rightarrow \mathbb{R}
+\end{equation}
+\begin{definition}[Multilinear extension]
+The multilinear extension of $f$ is the function $F:[0,1]^{n} \rightarrow \mathbb{R}$ defined by:
+\begin{equation}
+    F(x)=\sum_{S \subseteq N} f(S) \prod_{i \in S} x_{i} \prod_{i \in N \backslash S}\left(1-x_{i}\right)
+\end{equation}
+\end{definition}
+Let $x \vee y$ be the coordinatewise maximum of $x$ and $y$. We also write $F_y(x) = F (x \vee y) - F (y)$ which generalizes the definition of marginal values to the continuous setting.
+
+There is a probabilistic interpretation of the multilinear extension. Given $x \in[0,1]^{n}$ we can define $X$ to be the random subset of $N$ in which each element $i \in N $ is included independently with probability $x_i$ and not included with probability $1 - x_i$. We write $X\sim x$ to say that $X$ is the random subset sampled according to $x$. Then the multilinear extension $F$ is simply:
+\begin{equation}
+    F(x)=\underset{X \sim x}{\mathbb{E}}[f(X)]
+\end{equation}
+For this reason, using the multilinear extension is often called relaxing through expectation.
+
 Parallel Greedy is a straightforward parallelization of the original continuous-greedy algorithm due to Călinescu et al.~\cite{CGC11}, specialized to the cardinality polytope. Continuous-greedy is an iterative and monotonic algorithm that, in each iteration, computes the gradient $\nabla F(x)$ and finds the point $v$ in the constraint polytope that maximizes
 $\left<\nabla F(x), v\right>$. 
 
-Since we consider a model where we only have oracle access to the set function $f$, we use the alternative algorithm randomized-parallel-greedy, which is guided by the previous parallel-greedy algorithm, but maintains a discrete set $Q \in N$ rather than a fractional solution $x$. The primary difference is in steps, where rather than add the fractional solution $\delta S$ to our solution, we first sample a set $R\sim\delta S$ (where each coordinate in S is drawn independently with probability $\delta$), and then we add $R$ to the running solution.
+Since we consider a model where we only have oracle access to the set function $f$, we use the alternative algorithm randomized-parallel-greedy, which is guided by the previous parallel-greedy algorithm, but maintains a discrete set $Q \subset N$ rather than a fractional solution $x$. The primary difference is in steps, where rather than add the fractional solution $\delta S$ to the solution, we first sample a set $R\sim\delta S$ (where each element in $S$ is drawn independently with probability $\delta$), and then we add $R$ to the running solution~\cite{chekuri2018submodular}.
 
 The variable $t$ is used to track the expected cardinality of $|Q|$. One can simplify the algorithm by replacing the variable $t$ with $|Q|$ wherever it appears, and the analysis would generally still hold. The inclusion of $t$ makes the analysis more straightforward, as we can use $t$ to track progress throughout the algorithm.
+
+
+Estimating OPT: The algorithm requires a value $\lambda$ that is an upper bound on OPT. Preprocessing allows us to choose $\lambda=\sum_{j} f(j)$ and we have $OPT \leq \lambda \leq n\cdot OPT$. It is also useful to have an estimate that is within a constant factor. This can be done by running the algorithm in parallel with $O(\log n)$ geometrically increasing values of $\lambda$ and picking the best solution from the parallel runs.
+
+Let us describe the algorithm in more detail. At first, we initialize the variables and estimate the OPT (the search for the estimate is part of the preprocessing). Then we construct a set of candidates satisfying the condition (we want to select the elements so that their marginal values were greater than the average value for the optimum).
+
+After that, we choose the largest $\delta$ that satisfies the condition that the expectation of the marginal value is large enough and that the cardinality constraint holds. Then we sample the subset and add to the solution, update the variables, and then continue the loop. When we exit the inner loop, we decrease the estimate of the optimal value and build a new set of candidates.
+
 \begin{algorithm}[H]
 \caption{Randomized Parallel Greedy}
 \begin{algorithmic}
     	\STATE \textbf{input} function $f$, cardinality constraint $k$, parameter $\varepsilon$
 \STATE$1 . Q \leftarrow \emptyset, t \leftarrow 0, \lambda \leftarrow \mathrm{OPT} / /$ or any $\lambda \geq \mathrm{OPT}$
-\STATE 2. while $t \leq(1-2 \epsilon) k$ and $\lambda \geq e^{-1}$ OPT
-\STATE \quad A. let $S=\left\{j \in N: f_{Q}(j) \geq \frac{(1-\epsilon) \lambda}{k}\right\}$
-\STATE \quad B. while $S$ is not empty and $t \leq(1-2 \epsilon) k$
+\STATE 2. while $t \leq(1-2 \varepsilon) k$ and $\lambda \geq e^{-1}$ OPT
+\STATE \quad A. let $S=\left\{j \in N: f_{Q}(j) \geq \frac{(1-\varepsilon) \lambda}{k}\right\}$
+\STATE \quad B. while $S$ is not empty and $t \leq(1-2 \varepsilon) k$
 \STATE \quad \quad i. chose $\delta$ maximal s.t.
-\STATE \quad \quad \quad a. $F_{Q}(Q+\delta S) \geq(1-\epsilon)^{2} \lambda \frac{\delta|S|}{k}$
-\STATE \quad \quad \quad b. $t+\delta|S| \leq(1-2 \epsilon) k$
+\STATE \quad \quad \quad a. $F_{Q}(Q+\delta S) \geq(1-\varepsilon)^{2} \lambda \frac{\delta|S|}{k}$
+\STATE \quad \quad \quad b. $t+\delta|S| \leq(1-2 \varepsilon) k$
 \STATE \quad \quad ii. sample $R \sim \delta S$
 \STATE \quad \quad iii. $Q \leftarrow Q \cup R, t \leftarrow t+\delta|S|$
 \STATE \quad \quad iv. update $S$
-\STATE \quad C. $\quad \lambda \leftarrow(1-\epsilon) \lambda$
+\STATE \quad C. $\quad \lambda \leftarrow(1-\varepsilon) \lambda$
 \STATE 3. return $Q$
   \end{algorithmic}
   \label{alg:full}
@@ -200,13 +242,13 @@ The variable $t$ is used to track the expected cardinality of $|Q|$. One can sim
 % \textsc{FAST} obtains a $1-1/e-\epsilon$ approximation w.p. $1- \delta$ and that it has $\tilde{O}(\varepsilon^{-2} \log n)$  adaptive complexity and $\tilde{O}(\varepsilon^{-2} n +\varepsilon^{-4} \log(n)  \log(\delta^{-1}))$ query complexity.
 \begin{theorem}[\textsc{FAST}~\cite{breuer2019fast}]
 \label{thm:main_FAST} 
-Assume $k \geq \frac{2 \log(2\delta^{-1} \ell)}{\varepsilon^2 (1 - 5\varepsilon)}$ and $\varepsilon \in (0, 0.1)$, where  $\ell = \log(\frac{\log k}{\epsilon})$. Then, \textsc{FAST} with $m = \frac{2 + \varepsilon}{\varepsilon^2(1 -  3\varepsilon)} \log(\frac{4\ell\log n}{\delta \varepsilon^2})$ has at most $\varepsilon^{-2} \log(n)  \ell^2$  adaptive rounds,   
+Assume $k \geq \frac{2 \log(2\delta^{-1} \ell)}{\varepsilon^2 (1 - 5\varepsilon)}$ and $\varepsilon \in (0, 0.1)$, where  $\ell = \log(\frac{\log k}{\varepsilon})$. Then, \textsc{FAST} with $m = \frac{2 + \varepsilon}{\varepsilon^2(1 -  3\varepsilon)} \log(\frac{4\ell\log n}{\delta \varepsilon^2})$ has at most $\varepsilon^{-2} \log(n)  \ell^2$  adaptive rounds,   
 $2\varepsilon^{-2}  \ell n +  \varepsilon^{-2} \log(n) \ell^2 m$ queries, and achieves a $1 - \frac{1}{e} - 4 \varepsilon$ approximation 
 w.p. $1 - \delta$.
 \end{theorem} 
 
 \begin{theorem}[\textsc{Randomized-Parallel-Greedy}~\cite{chekuri2018submodular}]
-Let $\epsilon>0$ be given, let $f: 2^{\mathcal{N}} \rightarrow \mathbb{R}_{\geq 0}$ be a normalized, monotone submodular function in the oracle model, and let $k \in \mathbb{N}$. Then with high probability, randomized-parallel-greedy computes a $(1-\epsilon)\left(1-e^{-1}\right)$ multiplicative approximation to the maximum value set of cardinality $k$ with $O\left(\frac{\log n}{\epsilon^{2}}\right)$ expected adaptivity and $\tilde{O}\left(\frac{n}{\epsilon^{4}}\right)$ expected oracle calls to $f$.
+Let $\varepsilon>0$ be given, let $f: 2^{\mathcal{N}} \rightarrow \mathbb{R}_{\geq 0}$ be a normalized, monotone submodular function in the oracle model, and let $k \in \mathbb{N}$. Then with high probability, randomized-parallel-greedy computes a $(1-\varepsilon)\left(1-e^{-1}\right)$ multiplicative approximation to the maximum value set of cardinality $k$ with $O\left(\frac{\log n}{\epsilon^{2}}\right)$ expected adaptivity and $\tilde{O}\left(\frac{n}{\varepsilon^{4}}\right)$ expected oracle calls to $f$.
 \end{theorem}
 
 \begin{table}[h]
@@ -216,9 +258,9 @@ Let $\epsilon>0$ be given, let $f: 2^{\mathcal{N}} \rightarrow \mathbb{R}_{\geq 
         % \hline
 %  Randomized-Parallel-Greedy
  \textsc{Randomized-Parallel-Greedy}~\cite{chekuri2018submodular}& $\mathcal{O}\left(  \frac{n}{\varepsilon^4}  \log\left(\frac{n}{\delta}\right) \log^2 n\right)  $ & $ \mathcal{O}\left(\frac{\log n}{\varepsilon^2}  \right)$ & \\\ \vspace{0.3cm}
-  \textsc{FAST}~\cite{breuer2019fast} &     $\mathcal{O}\left(\frac{  n \ell}{\varepsilon^2} +  \frac{ \ell^2 \log n}{\epsilon^4}   \log(\frac{\ell\log n}{\delta \varepsilon^2})\right)$        &   $\mathcal{O}\left(\frac{ \ell^2 \log n}{\varepsilon^2}\right)$   & 
+  \textsc{FAST}~\cite{breuer2019fast} &     $\mathcal{O}\left(\frac{  n \ell}{\varepsilon^2} +  \frac{ \ell^2 \log n}{\varepsilon^4}   \log(\frac{\ell\log n}{\delta \varepsilon^2})\right)$        &   $\mathcal{O}\left(\frac{ \ell^2 \log n}{\varepsilon^2}\right)$   & 
 \end{tabular}
-  \caption{Comparison on the query complexity and adaptivity achieved in order to obtain a $1-1/e-\epsilon$ approximation with probability $1 - \delta$, where  $\ell = \log(\frac{\log k}{\epsilon})$.  }
+  \caption{Comparison on the query complexity and adaptivity achieved in order to obtain a $1-1/e-\varepsilon$ approximation with probability $1 - \delta$, where  $\ell = \log\left(\frac{\log k}{\varepsilon}\right)$.  }
   \label{tab:queries}
 \end{center}
 \end{table}
@@ -234,41 +276,69 @@ Since the objective of the Max Cover takes into account the connectivity of the 
     \item \emph{Barb\'{a}si-Albert} (BA)
 \end{itemize}
 
-To test how well the algorithms perform on these graphs, we additionally plan on running experiments for different sample complexities of the graphs - to the extent the Ibex CPU clusters provided by KAUST can tolerate. Presumably starting at 500 nodes and scaling to higher sizes depending on the computational load our parallel setup can support.
+\paragraph{Stochastic block model}
+The stochastic block model takes the following parameters:
+\begin{itemize}
+    \item The number $n$ of vertices;
+    \item a partition of the vertex set $\{1,\ldots,n\}$ into disjoint subsets $C_1,\ldots,C_r$, called 'communities';
+    \item a symmetric $r \times r$ matrix $P$ of edge probabilities.
+\end{itemize} 
+The edge set is then sampled at random as follows: any two vertices $u \in C_i$ and $v \in C_j$ are connected by an edge with probability $P_{ij}$. An example problem is: given a graph with $n$ vertices, where the edges are sampled as described, recover the groups $C_1,\ldots,C_r$.
+
+\paragraph{Erd\H{o}s R\'{e}nyi}
+There are two closely related variants of the Erd\H{o}s R\'{e}nyi random graph model. In the $G(n,M)$ model, a graph is chosen uniformly at random from the collection of all graphs which have $n$ nodes and $M$ edges.  For example, in the $G(3,2)$ model, each of the three possible graphs on three vertices and two edges are included with probability $\frac{1}{3}$. 
+
+In the $G(n,p)$ model, a graph is constructed by connecting nodes randomly. Each edge is included in the graph with probability $p$ independent from every other edge. Equivalently, all graphs with $n$ nodes and $M$ edges have equal probability of $p^M (1-p)^{{n \choose 2}-M}$.
+The parameter $p$ in this model can be thought of as a weighting function; as $p$ increases from $0$ to $1$, the model becomes more and more likely to include graphs with more edges and less and less likely to include graphs with fewer edges. In particular, the case $p = 0.5$ corresponds to the case where all $2^\binom{n}{2}$ graphs on $n$ vertices are chosen with equal probability.
+
+\paragraph{Watts-Strogatz}\\
+Given the desired number of nodes $N$, the mean $K$ (assumed to be an even integer), and a special parameter $\beta$, satisfying $0 \leq \beta \leq 1$ and $N\gg K \gg \ln N \gg 1$, the model constructs an undirected graph with $N$ nodes and $\frac{NK}{2}$ edges in the following way:
+\begin{itemize}
+    \item Construct a regular ring lattice, a graph with $N$ nodes each connected to $K$ neighbors, $K/2$ on each side. That is, if the nodes are labeled  $0 \ldots {N-1}$, there is an edge $(i, j)$ if and only if $0 < |i - j|\ \mathrm{mod}\ \left( N-1-\frac K 2 \right) \leq \frac K 2.$
+    \item For every node $i=0,\dots, {N-1}$ take every edge connecting $i$ to its $K/2$ rightmost neighbors, that is every edge $(i, j\ \mathrm{mod}\ N)$ with $i < j \leq i + K/2$, and rewire it with probability $\beta$. Rewiring is done by replacing $(i, j\ \mathrm{mod}\ N)$ with $(i, k)$ where $k$ is chosen uniformly at random from all possible nodes while avoiding self-loops ($k \ne i$) and link duplication (there is no edge $(i, {k'})$ with $k' = k$ at this point in the algorithm).
+\end{itemize}
+
+\paragraph{Barb\'{a}si-Albert}
+The steps of the growth of the network according to the Barabasi–Albert model  ($m_0=m=2$).
+The network begins with an initial connected network of $m_0$ nodes.
+
+New nodes are added to the network one at a time. Each new node is connected to $m \le m_0$ existing nodes with a probability that is proportional to the number of links that the existing nodes already have. Formally, the probability $p_i$ that the new node is connected to node $i$ is 
+$$p_i = \frac{k_i}{\sum_j k_j},$$
+
+where $k_i$ is the degree of node $i$ and the sum is made over all pre-existing nodes $j$ (i.e. the denominator results in twice the current number of edges in the network). Heavily linked nodes ("hubs") tend to quickly accumulate even more links, while nodes with only a few links are unlikely to be chosen as the destination for a new link. The new nodes have a "preference" to attach themselves to the already heavily linked nodes.
+\\
+
+To test how well the algorithms perform on these graphs, we additionally plan on running experiments for different sample sizes of the graphs - to the extent the Ibex CPU clusters provided by KAUST can tolerate. Presumably starting at 500 nodes and scaling to higher sizes depending on the computational load our parallel setup can support.
 
 \section{Implementation Plans}
 
-For implementing, we have divided up the work into 4 parts:
+For implementation, we have divided up the work to consist of data generation, algorithms implementation in Python, and setting up the support for testing parallelization.
+For setting up the parallelization, we plan on using the Message Passing Interface (MPI) library, which allows handling the parallel communication between processors. This setup will need to be done on Ibex, which gives access to multiple CPUs.
 
-\begin{itemize}
-    \item Generating the graphs
-    \item Implementing FAST in python
-    \item Implementing Random Parallel Greedy in python
-    \item Setup support for testing parallelizations
-\end{itemize}
-
-For setting up the parallelization, we plan on using Message Passing Interface (MPI), which allows handling the parallel communication between processors. This setup will need to be done on Ibex, which gives access to multiple CPUs.
-
-\begin{center}
-\begin{tabular}{||c c||} 
- \hline
- Date & Tasks \\
- \hline\hline
- 2-8 November & Implement Synthetic Graph Generation  \\ 
- \hline
- 9-15 November & Implement Randomized-Parallel-Greedy \\
- \hline
- 16-22 November & Implement FAST algorithm  \\
- \hline
- 23-29 November & Setup Ibex environment and Debug  \\
- \hline
- 1-7 December & Run experiments and obtain results  \\
- \hline
- 8-13 December & Prepare for project report and presentation  \\
- \hline
-\end{tabular}
-\end{center}
-
+\begin{table}[H]
+    \begin{center}
+        \begin{tabular}{||c c||} 
+         \hline
+         Date & Tasks \\
+         \hline\hline
+         2-8 November & Implement Synthetic Graph Generation  \\ 
+         \hline
+         9-15 November & Implement Randomized-Parallel-Greedy \\
+         \hline
+         16-22 November & Implement FAST algorithm  \\
+         \hline
+         23-29 November & Setup Ibex environment and Debug  \\
+         \hline
+         1-7 December & Run experiments and obtain results  \\
+         \hline
+         8-13 December & Prepare for project report and presentation  \\
+         \hline
+        \end{tabular}
+    \caption{Preliminary schedule to meet our implementation goals.}
+    \label{tab:schedule}
+    \end{center}
+\end{table}
+\clearpage
 % \tiny % \small
 \begin{thebibliography}{99}
     \bibitem[NW78]{nemhauser1978best} 
